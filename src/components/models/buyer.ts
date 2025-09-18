@@ -45,13 +45,34 @@ export class Buyer {
     };
   }
 
-  // Валидация данных (простейшая)
-  validate(): boolean {
-    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.data.email);
-    const phoneValid = /^\+\d{6,15}$/.test(this.data.phone);
-    const addressValid = this.data.address.trim().length > 5;
-    const paymentValid = this.data.payment !== "";
+  // Валидация данных покупателя
+  validate(): { isValid: boolean; errors: Record<keyof IBuyer, string> } {
+    const errors: Record<keyof IBuyer, string> = {
+      payment: "",
+      address: "",
+      email: "",
+      phone: "",
+    };
 
-    return emailValid && phoneValid && addressValid && paymentValid;
+    if (!this.data.payment) {
+      errors.payment = "Необходимо выбрать способ оплаты (card или cash)";
+    }
+
+    if (!this.data.address.trim()) {
+      errors.address = "Необходимо ввести адрес доставки";
+    }
+
+    if (!this.data.email.trim()) {
+      errors.email = "Необходимо ввести адрес электронной почты";
+    }
+
+    if (!this.data.phone.trim()) {
+      errors.phone = "Необходимо ввести номер телефона";
+    }
+
+    return {
+      isValid: Object.values(errors).every((error) => error === ""),
+      errors,
+    };
   }
 }

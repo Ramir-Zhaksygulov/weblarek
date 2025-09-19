@@ -29,3 +29,15 @@ export interface IBuyer {
   phone: string;
   address: string;
 }
+
+// Объект заказа, который мы отправляем на сервер
+export interface IOrderRequest extends IBuyer {
+  total: number;
+  items: string[];
+}
+
+// Объект ответа от сервера при успешном заказе
+export interface IOrderResponse {
+  id: string;
+  total: number;
+}

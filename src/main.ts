@@ -8,6 +8,7 @@ import { WebLarekApi } from "./components/models/webLarekApi";
 import { apiProducts } from "./utils/data";
 import { Api } from "./components/base/Api";
 import { API_URL } from "./utils/constants";
+import { IOrderRequest } from "./types";
 
 // Проверяем ProductCatalog
 const productsModel = new Products();
@@ -97,7 +98,7 @@ async function sendOrderToServer() {
     return;
   }
 
-  const order = {
+  const order: IOrderRequest = {
     payment: buyerModel.getData().payment,
     email: buyerModel.getData().email,
     phone: buyerModel.getData().phone,

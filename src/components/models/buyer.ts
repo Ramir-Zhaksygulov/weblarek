@@ -1,5 +1,12 @@
-import { IBuyer, TPayment } from "../../types";
+import { IBuyer, TPayment, IProduct, IOrderRequest } from "../../types";
+import { EventEmitter, IEvents } from "../base/Events";
 
+/**
+ * Класс Buyer управляет данными покупателя:
+ * - хранит и обновляет информацию о платеже, контактах и адресе;
+ * - выполняет валидацию полей;
+ * - генерирует события для обновления UI.
+ */
 export class Buyer {
   private data: IBuyer = {
     payment: "",
@@ -8,34 +15,48 @@ export class Buyer {
     address: "",
   };
 
-  // Сохранение всех данных
+  public events: IEvents;
+
+  constructor() {
+    this.events = new EventEmitter();
+  }
+
+  // Устанавливает все данные покупателя.
   setData(data: IBuyer): void {
     this.data = data;
+    this.events.emit("buyer:dataChanged", { data: this.data });
   }
 
-  // Установка отдельных полей
+  // Устанавливает способ оплаты.
   setPayment(payment: TPayment): void {
     this.data.payment = payment;
+    this.events.emit("buyer:paymentChanged", { payment });
   }
 
+  // Устанавливает email.
   setEmail(email: string): void {
     this.data.email = email;
+    this.events.emit("buyer:emailChanged", { email });
   }
 
+  // Устанавливает номер телефона.
   setPhone(phone: string): void {
     this.data.phone = phone;
+    this.events.emit("buyer:phoneChanged", { phone });
   }
 
+  // Устанавливает адрес доставки.
   setAddress(address: string): void {
     this.data.address = address;
+    this.events.emit("buyer:addressChanged", { address });
   }
 
-  // Получение всех данныхs
+  // Возвращает текущие данные покупателя.
   getData(): IBuyer {
     return this.data;
   }
 
-  // Очистка данных
+  // Очищает данные покупателя.
   clear(): void {
     this.data = {
       payment: "",
@@ -43,36 +64,57 @@ export class Buyer {
       phone: "",
       address: "",
     };
+    this.events.emit("buyer:cleared", { cleared: true });
   }
 
-  // Валидация данных покупателя
-  validate(): { isValid: boolean; errors: Record<keyof IBuyer, string> } {
-    const errors: Record<keyof IBuyer, string> = {
-      payment: "",
-      address: "",
-      email: "",
-      phone: "",
+  // Валидирует выбранные поля.
+  validateAll(fields: (keyof IBuyer)[]): {
+    isValid: boolean;
+    errors: Partial<Record<keyof IBuyer, string>>;
+  } {
+    const errors: Partial<Record<keyof IBuyer, string>> = {};
+
+    fields.forEach((field) => {
+      const value = (this.data[field] || "").toString().trim();
+      if (!value) {
+        errors[field] = this.getErrorMessage(field);
+      }
+    });
+
+    const isValid = Object.keys(errors).length === 0;
+    return { isValid, errors };
+  }
+
+  // Возвращает сообщение об ошибке по умолчанию.
+  private getErrorMessage(field: keyof IBuyer): string {
+    const messages: Record<keyof IBuyer, string> = {
+      payment: "Необходимо выбрать способ оплаты",
+      address: "Необходимо указать адрес",
+      email: "Необходимо указать email",
+      phone: "Необходимо указать номер телефона",
     };
+    return messages[field];
+  }
 
-    if (!this.data.payment) {
-      errors.payment = "Необходимо выбрать способ оплаты (card или cash)";
+  // Формирует текст ошибки для отображения.
+  getValidationMessage(errors: Partial<Record<keyof IBuyer, string>>): string {
+    const messages = Object.values(errors).filter(Boolean);
+
+    if (messages.length > 1) {
+      return "Необходимо заполнить все поля";
     }
 
-    if (!this.data.address.trim()) {
-      errors.address = "Необходимо ввести адрес доставки";
-    }
+    return messages.join(". ");
+  }
 
-    if (!this.data.email.trim()) {
-      errors.email = "Необходимо ввести адрес электронной почты";
-    }
-
-    if (!this.data.phone.trim()) {
-      errors.phone = "Необходимо ввести номер телефона";
-    }
-
+  getOrderData(items: IProduct[], total: number): IOrderRequest {
     return {
-      isValid: Object.values(errors).every((error) => error === ""),
-      errors,
+      payment: this.getData().payment,
+      address: this.getData().address,
+      email: this.getData().email,
+      phone: this.getData().phone,
+      items: items.map((item) => item.id),
+      total,
     };
   }
 }

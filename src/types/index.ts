@@ -15,10 +15,10 @@ export type TPayment = "card" | "cash" | "";
 // Интерфейс товара
 export interface IProduct {
   id: string;
-  description: string;
-  image: string;
+  description?: string;
+  image?: string;
   title: string;
-  category: string;
+  category?: string;
   price: number | null;
 }
 

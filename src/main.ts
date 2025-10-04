@@ -5,117 +5,135 @@ import { Cart } from "./components/models/cart";
 import { Buyer } from "./components/models/buyer";
 import { WebLarekApi } from "./components/models/webLarekApi";
 
-import { apiProducts } from "./utils/data";
 import { Api } from "./components/base/Api";
 import { API_URL } from "./utils/constants";
-import { IOrderRequest } from "./types";
+import { EventEmitter } from "./components/base/Events";
 
-// Проверяем ProductCatalog
-const productsModel = new Products();
-productsModel.setItems(apiProducts.items);
+import { Header } from "./components/Header";
+import { Catalog } from "./components/Catalog";
+import { CardCatalog } from "./components/cards/CardCatalog";
+import { Modal } from "./components/Modal";
+import { CardPreview } from "./components/cards/CardPreview";
+import { Basket } from "./components/Basket";
+import { Order } from "./components/forms/Order";
+import { Contacts } from "./components/forms/Contacts";
+import { OrderSuccess } from "./components/OrderSuccess";
 
-console.log("Массив товаров из каталога:", productsModel.getItems());
+document.addEventListener("DOMContentLoaded", async () => {
+  const events = new EventEmitter();
+  const api = new Api(API_URL);
+  const webLarekApi = new WebLarekApi(api);
 
-// Проверяем Cart
-const cartModel = new Cart();
+  const buyer = new Buyer();
+  const cart = new Cart();
+  const products = new Products();
 
-// добавим первый товар из каталога
-const firstProduct = productsModel.getItems()[0];
-cartModel.addItem(firstProduct);
+  // Инициализация основных компонентов
+  const header = new Header(
+    events,
+    document.querySelector(".header") as HTMLElement
+  );
+  const catalog = new Catalog(
+    document.querySelector(".gallery") as HTMLElement
+  );
+  const modal = new Modal(
+    document.getElementById("modal-container") as HTMLElement,
+    events
+  );
+  const basket = new Basket(events, cart);
 
-console.log("Корзина после добавления товара:", cartModel.getItems());
-console.log("Есть ли товар в корзине?", cartModel.hasItem(firstProduct.id));
-console.log("Количество товаров:", cartModel.getCount());
-console.log("Общая стоимость:", cartModel.getTotalPrice());
+  // Подписки на события
+  events.on("cart:changed", () => (header.counter = cart.getCount()));
 
-// удалим товар
-cartModel.removeItem(firstProduct);
+  events.on("card:add", ({ productId }: { productId: string }) => {
+    const product = products.getItemById(productId);
+    if (product && !cart.hasItem(product.id)) {
+      cart.addItem(product);
+      events.emit("cart:changed");
+    }
+  });
 
-console.log("Корзина после удаления товара:", cartModel.getItems());
-console.log("Есть ли товар в корзине?", cartModel.hasItem(firstProduct.id));
-console.log("Количество товаров:", cartModel.getCount());
+  events.on("card:remove", ({ productId }: { productId: string }) => {
+    const item = cart.getItems().find((i) => i.id === productId);
+    if (item) {
+      cart.removeItem(item);
+      events.emit("cart:changed");
+    }
+  });
 
-// Добавим несколько товаров для проверки очистки
-const secondProduct = productsModel.getItems()[1];
-cartModel.addItem(firstProduct);
-cartModel.addItem(secondProduct);
+  events.on("basket:open", () => modal.open(basket.render()));
 
-console.log("Корзина после добавления товара:", cartModel.getItems());
-console.log("Количество товаров:", cartModel.getCount());
-console.log("Общая стоимость:", cartModel.getTotalPrice());
+  events.on("basket:order", () => {
+    if (cart.getCount() === 0) return;
+    startOrderProcess();
+  });
 
-// // очистим корзину
-cartModel.clear();
+  events.on("card:select", ({ productId }: { productId: string }) => {
+    const product = products.getItemById(productId);
+    if (product) {
+      const inBasket = cart.hasItem(product.id);
+      const previewCard = new CardPreview(
+        document.createElement("div"),
+        {
+          ...product,
+          inBasket,
+          buttonText: inBasket ? "Удалить из корзины" : "Купить",
+        },
+        events
+      );
+      modal.open(previewCard.render());
+    }
+  });
 
-console.log("Корзина после очистки:", cartModel.getItems());
+  events.on("catalog:open", () => {
+    modal.close();
+    catalog.render();
+  });
 
-// Проверяем Buyer
-const buyerModel = new Buyer();
+  // Загрузка товаров
+  const items = await webLarekApi.fetchProducts();
+  products.setItems(items);
+  catalog.itemsList = items.map(
+    (item) =>
+      new CardCatalog(document.createElement("div"), { ...item }, events)
+  );
 
-// сохраняем часть данных
-buyerModel.setPhone("+77001234567");
-buyerModel.setEmail("ivan@example.com");
+  /** Запуск процесса оформления заказа */
+  function startOrderProcess() {
+    const orderContainer = document.createElement("div");
+    const order = new Order(orderContainer, events, buyer);
+    modal.open(order.render());
 
-console.log("Данные покупателя:", buyerModel.getData());
-console.log("Ошибки валидации:", buyerModel.validate());
+    const onOrderSubmitted = () => {
+      events.off("order:submitted", onOrderSubmitted);
 
-buyerModel.setPayment("card");
-buyerModel.setAddress("Almaty");
+      const contactsContainer = document.createElement("div");
+      const contacts = new Contacts(contactsContainer, events, buyer);
+      modal.open(contacts.render());
 
-console.log("Данные покупателя:", buyerModel.getData());
-console.log("Ошибки валидации:", buyerModel.validate());
+      const onContactsSubmitted = async () => {
+        events.off("contacts:submitted", onContactsSubmitted);
 
-// Создаем экземпляр Api и WebLarekApi
-const api = new Api(API_URL);
-const webApi = new WebLarekApi(api);
+        const orderData = buyer.getOrderData(
+          cart.getItems(),
+          cart.getTotalPrice()
+        );
+        const total = cart.getTotalPrice();
 
-// Загружаем каталог с сервера
-async function loadProducts() {
-  try {
-    const items = await webApi.fetchProducts();
-    productsModel.setItems(items);
-    console.log("Каталог из сервера:", productsModel.getItems());
-  } catch (err) {
-    console.error("Ошибка загрузки товаров:", err);
+        await webLarekApi.sendOrder(orderData);
+
+        cart.clear();
+        buyer.clear();
+        events.emit("cart:changed");
+
+        const successContainer = document.createElement("div");
+        const orderSuccess = new OrderSuccess(successContainer, events);
+        modal.open(orderSuccess.render(total));
+      };
+
+      events.on("contacts:submitted", onContactsSubmitted);
+    };
+
+    events.on("order:submitted", onOrderSubmitted);
   }
-}
-
-loadProducts();
-
-// Формируем заказ и отправляем
-async function sendOrderToServer() {
-  cartModel.addItem(firstProduct);
-  cartModel.addItem(secondProduct);
-
-  if (!cartModel.getCount()) {
-    console.warn("Корзина пуста, заказ не отправлен");
-    return;
-  }
-
-  const validation = buyerModel.validate();
-  if (!validation.isValid) {
-    console.warn("Покупатель некорректен:", validation.errors);
-    return;
-  }
-
-  const order: IOrderRequest = {
-    payment: buyerModel.getData().payment,
-    email: buyerModel.getData().email,
-    phone: buyerModel.getData().phone,
-    address: buyerModel.getData().address,
-    total: cartModel.getTotalPrice(),
-    items: cartModel.getItems().map((item) => item.id),
-  };
-
-  console.log("Формируемый заказ:", order);
-
-  try {
-    const response = await webApi.sendOrder(order);
-    console.log("Ответ сервера:", response);
-  } catch (err) {
-    console.error("Ошибка отправки заказа:", err);
-  }
-}
-
-// Отправляем заказ
-sendOrderToServer();
+});

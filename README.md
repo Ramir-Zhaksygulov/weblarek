@@ -196,7 +196,6 @@ Presenter - презентер содержит основную логику п
 `clear(): void` — очищает данные покупателя  
 `validate(): boolean` — проверяет корректность данных покупателя
 
-
 ## Слой коммуникации
 
 Слой коммуникации отвечает за взаимодействие приложения с сервером «Веб-ларёк». Он позволяет получать данные о товарах с сервера и отправлять данные о заказах. Для работы используется класс Api, который реализует базовые методы get и post.
@@ -217,3 +216,214 @@ Presenter - презентер содержит основную логику п
 Пример ответа от сервера: { items: IProduct[] }. Метод возвращает только массив items.
 
 `sendOrder(buyer: IBuyer, products: IProduct[]): Promise<object>` — выполняет POST-запрос на эндпоинт /order/ и отправляет на сервер данные о покупателе и выбранных товарах.
+
+### Документация View
+
+Базовый класс
+Component<T>
+
+Назначение: общий базовый класс для всех компонентов интерфейса (карточки, корзина, формы).
+
+Поля:
+
+`container: HTMLElement` — корневой элемент компонента.
+
+Методы:
+
+`render(data?: T): HTMLElement` — отрисовка компонента, возвращает DOM-элемент.
+
+`setText(el: HTMLElement, value: string): void` — установить текст элемента.
+
+`setImage(el: HTMLImageElement, src: string, alt?: string): void` — установить изображение.
+
+`toggleClass(el: HTMLElement, className: string, force?: boolean): void` — переключение класса элемента.
+
+Карточки товара
+
+## Card (родитель)
+
+Назначение: базовый класс для всех карточек товара.
+
+Поля:
+
+`titleEl: HTMLElement` — название.
+
+`priceEl: HTMLElement` — цена.
+
+`imageEl: HTMLImageElement` — картинка.
+
+`buttonEl: HTMLButtonElement` — кнопка действия.
+
+Методы:
+
+`setTitle(title: string): void`
+
+`setPrice(price: number | null): void`
+
+`setImage(src: string): void`
+
+`setButton(text: string, disabled?: boolean): void`
+
+События: нет — реализуются в наследниках.
+
+## CardCatalog extends Card
+
+Назначение: карточка товара в каталоге.
+
+Доп. поля:
+
+`categoryEl: HTMLElement` — категория товара.
+
+События:
+
+`card:select` — пользователь кликнул по карточке (открыть модалку товара).
+
+## CardPreview extends Card
+
+Назначение: карточка товара в модальном окне «подробнее».
+
+События:
+
+`card:add` — пользователь нажал «Купить».
+
+`card:remove` — пользователь нажал «Удалить из корзины».
+
+## CardBasket extends Card
+
+Назначение: карточка товара в корзине.
+
+Доп. поля:
+
+`indexEl: HTMLElement` — порядковый номер товара.
+
+События:
+
+`basket:item:remove` — пользователь удалил товар из корзины.
+
+Контейнеры
+
+## Catalog
+
+Назначение: список товаров (галерея на главной).
+
+Поля:
+
+`container: HTMLElement` — корневой элемент <main class="gallery">.
+
+Свойства:
+
+`itemsList: Card[]` — список карточек для отображения.
+
+Методы:
+
+`render(): void` — отрисовать список карточек.
+
+## Basket
+
+Назначение: корзина товаров.
+
+Поля:
+
+`listEl: HTMLElement` — список карточек корзины.
+
+`totalEl: HTMLElement` — сумма заказа.
+
+`buttonEl: HTMLButtonElement` — кнопка «Оформить».
+
+События:
+
+`basket:order` — пользователь нажал «Оформить».
+
+## Header
+
+Назначение: шапка сайта.
+
+Поля:
+
+`counterEl: HTMLElement` — счётчик товаров в корзине.
+
+`basketButton: HTMLButtonElement` — кнопка открытия корзины.
+
+События:
+
+`basket:open` — пользователь открыл корзину.
+
+Модалки
+
+## Modal
+
+Назначение: универсальное модальное окно.
+
+Поля:
+
+`container: HTMLElement` — корневой элемент .modal.
+
+`contentEl: HTMLElement` — контейнер для содержимого.
+
+Методы:
+
+`open(content: HTMLElement): void` — открыть модалку с содержимым.
+
+`close(): void` — закрыть модалку.
+
+События:
+
+`modal:close` — пользователь закрыл окно.
+
+Формы
+
+## Form (родитель)
+
+Назначение: общий функционал для всех форм.
+
+Поля:
+
+`formEl: HTMLFormElement` — форма.
+
+`errorEls: Map<string, HTMLElement>` — ошибки полей формы.
+
+Методы:
+
+`setError(field: string, message: string): void`
+
+`clearErrors(): void`
+
+События:
+
+`form:submit` — пользователь отправил форму.
+
+## Order extends Form
+
+Назначение: форма выбора оплаты + адрес доставки.
+
+События:
+
+`order:submitted` — переход к следующему шагу оформления.
+
+## Contacts extends Form
+
+Назначение: форма контактов (почта и телефон).
+
+События:
+
+`contacts:submitted` — завершение оформления заказа.
+
+События (краткий список)
+
+`card:select` — открыть модалку товара.
+
+`card:add` — добавить товар в корзину.
+
+`card:remove` — убрать товар из корзины.
+
+`basket:item:remove` — удалить товар из корзины.
+
+`basket:order` — перейти к оформлению заказа.
+
+`basket:open` — открыть корзину.
+
+`modal:close` — закрыть модалку.
+
+`order:submitted` — пользователь перешёл к следующему шагу заказа.
+
+`contacts:submitted` — пользователь завершил оформление заказа.

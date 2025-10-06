@@ -1,51 +1,51 @@
 import { IProduct } from "../../types";
-import { EventEmitter, IEvents } from "../base/Events";
+import { IEvents } from "../base/Events";
 
 export class Cart {
   private items: IProduct[] = [];
-  public events: IEvents;
+  private events: IEvents; 
 
-  constructor() {
-    this.events = new EventEmitter();
+  constructor(events: IEvents) {
+    this.events = events;
   }
 
-  // Получение товаров из корзины
+  // Возвращает товары в корзине
   getItems(): IProduct[] {
     return this.items;
   }
 
-  // Добавление товара
+  // Добавляет товар в корзину
   addItem(item: IProduct): void {
     this.items.push(item);
-    this.events.emit("cart:itemAdded", { item });
-    this.events.emit("cart:changed", { items: this.items });
+    this.events.emit("cart:itemAdded", { item }); 
+    this.events.emit("cart:changed"); 
   }
 
-  // Удаление товара
+  // Удаляет товар из корзины
   removeItem(item: IProduct): void {
     this.items = this.items.filter((i) => i.id !== item.id);
     this.events.emit("cart:itemRemoved", { item });
-    this.events.emit("cart:changed", { items: this.items });
+    this.events.emit("cart:changed");
   }
 
-  // Очистка корзины
+  // Очищает корзину
   clear(): void {
     this.items = [];
-    this.events.emit("cart:cleared", { cleared: true });
-    this.events.emit("cart:changed", { items: this.items });
+    this.events.emit("cart:cleared");
+    this.events.emit("cart:changed");
   }
 
-  // Стоимость всех товаров
+  // Возвращает общую стоимость товаров
   getTotalPrice(): number {
     return this.items.reduce((sum, item) => sum + (item.price ?? 0), 0);
   }
 
-  // Количество товаров
+  // Возвращает количество товаров в корзине
   getCount(): number {
     return this.items.length;
   }
 
-  // Проверка наличия по id
+  // Проверяет, есть ли товар по ID
   hasItem(id: string): boolean {
     return this.items.some((item) => item.id === id);
   }

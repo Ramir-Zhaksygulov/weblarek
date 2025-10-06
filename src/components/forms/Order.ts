@@ -6,71 +6,88 @@ import { Buyer } from "../models/buyer";
 
 export type IOrderFormData = Pick<IBuyer, "payment" | "address">;
 
-// Класс формы
+// Класс формы оформления заказа
 export class Order extends Form<IOrderFormData> {
+  private orderTemplate!: HTMLElement;
+  private paymentButtons: HTMLButtonElement[] = [];
+
   constructor(container: HTMLElement, events: IEvents, private buyer: Buyer) {
     super(container, events);
+    this.orderTemplate = this.createTemplate();
   }
 
-  // Рендерим форму заказа из шаблона
-  public render(): HTMLElement {
-    // клонируем HTML-шаблон формы заказа
-    const orderTemplate = cloneTemplate<HTMLFormElement>("#order");
+  // Создаёт и инициализирует шаблон формы
+  private createTemplate(): HTMLElement {
+    const template = cloneTemplate<HTMLFormElement>("#order");
+    this.formElement = template as HTMLFormElement;
 
-    // сохраняем ссылки на основные элементы
-    this.formElement = orderTemplate as HTMLFormElement;
     this.submitButton = ensureElement<HTMLButtonElement>(
       ".order__button",
       this.formElement
     );
+
     this.errorContainer = ensureElement<HTMLElement>(
       ".form__errors",
       this.formElement
     );
 
-    // задаём список полей, которые нужно проверять
     this.fieldsToValidate = ["payment", "address"];
 
-    // сбрасываем форму перед использованием
-    this.resetForm?.();
-    // инициализируем обработчики для полей (оплата + адрес)
-    this.initFields();
-    // проверяем валидность сразу при загрузке
-    this.checkValidity();
-    // активируем общую инициализацию из базового Form
-    this.init();
+    // Сброс формы
+    this.resetForm();
 
-    return orderTemplate;
+    // Инициализация полей
+    this.initFields();
+
+    // Проверка валидности при создании
+    this.checkValidity();
+
+    // Инициализация сабмита формы
+    this.initSubmit();
+
+    return template;
   }
 
-  // Навешиваем обработчики на кнопки оплаты и поле адреса
+  public render(): HTMLElement {
+    return this.orderTemplate;
+  }
+
+  // Получаем кнопки оплаты
+  private getPaymentButtons(): HTMLButtonElement[] {
+    if (this.paymentButtons.length === 0) {
+      this.paymentButtons = Array.from(
+        this.formElement.querySelectorAll<HTMLButtonElement>(
+          "button[name='card'], button[name='cash']"
+        )
+      );
+    }
+    return this.paymentButtons;
+  }
+
+  // Инициализация обработчиков
   private initFields(): void {
-    // кнопки для выбора способа оплаты
-    const paymentButtons = Array.from(
-      this.formElement.querySelectorAll<HTMLButtonElement>(
-        "button[name='card'], button[name='cash']"
-      )
-    );
+    const paymentButtons = this.getPaymentButtons();
 
-    // поле ввода адреса
-    const addressInput = this.formElement.querySelector<HTMLInputElement>(
-      "input[name='address']"
-    );
-
-    // при клике на кнопку — обновляем модель Buyer и визуальное состояние
+    // Обработка кликов по кнопкам оплаты
     paymentButtons.forEach((button) => {
       button.addEventListener("click", () => {
         this.buyer.setPayment(button.name as IOrderFormData["payment"]);
-        // сбрасываем выделение всех кнопок
+
+        // Сбрасываем стили
         paymentButtons.forEach((btn) => (btn.style.backgroundColor = ""));
-        // выделяем активную
+
+        // Выделяем выбранную
         button.style.backgroundColor = "#5F8CC7";
 
+        // Проверяем валидность
         this.checkValidity();
       });
     });
 
-    // при вводе адреса — обновляем Buyer и проверяем форму
+    // Поле адреса
+    const addressInput = this.formElement.querySelector<HTMLInputElement>(
+      "input[name='address']"
+    );
     if (addressInput) {
       addressInput.addEventListener("input", () => {
         this.buyer.setAddress(addressInput.value);
@@ -79,46 +96,46 @@ export class Order extends Form<IOrderFormData> {
     }
   }
 
-  // Проверяем валидность формы
+  // Сабмит формы
+  private initSubmit(): void {
+    this.formElement.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (this.checkValidity()) {
+        this.onSubmit();
+      }
+    });
+  }
+
+  // Проверка валидности
   protected checkValidity(): boolean {
-    // проверяем все необходимые поля через Buyer
     const validation = this.buyer.validateAll(this.fieldsToValidate);
     const message = this.buyer.getValidationMessage(validation.errors);
 
-    // если невалидна — выводим ошибку и блокируем кнопку
     if (!validation.isValid) {
       this.showError(message);
       this.submitButton.disabled = true;
       return false;
     }
 
-    // если всё ок — очищаем ошибки и активируем кнопку
     this.clearErrors();
     this.submitButton.disabled = false;
     return true;
   }
 
-  // Действие при успешной отправке формы
+  // При успешной отправке формы
   protected onSubmit(): void {
     this.events.emit("order:submitted", this.buyer.getData());
   }
 
-  // Текст кнопки отправки
   protected getSubmitText(): string {
     return "Далее";
   }
 
-  // Сброс формы (обнуляем данные и снимаем выделения)
+  // Сброс формы
   protected resetForm(): void {
     this.buyer.setPayment("");
     this.buyer.setAddress("");
     this.submitButton.disabled = true;
-
-    const paymentButtons = Array.from(
-      this.formElement.querySelectorAll<HTMLButtonElement>(
-        "button[name='card'], button[name='cash']"
-      )
-    );
-    paymentButtons.forEach((btn) => (btn.style.backgroundColor = ""));
+    this.getPaymentButtons().forEach((btn) => (btn.style.backgroundColor = ""));
   }
 }

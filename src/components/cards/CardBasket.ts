@@ -42,7 +42,7 @@ export class CardBasket extends Card<ICardBasketData> {
     );
     if (buttonEl) {
       buttonEl.addEventListener("click", () => {
-        this.events.emit("basket:item:remove", { index: this.index });
+        this.events.emit("card:remove", { productId: this.data.id });
       });
     }
 

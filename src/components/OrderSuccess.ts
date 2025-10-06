@@ -5,39 +5,43 @@ import { IEvents } from "./base/Events";
 // Класс отображения успешного оформления заказа
 export class OrderSuccess extends Component<{}> {
   protected events: IEvents;
+  private successTemplate!: HTMLElement;
+  private descriptionElement!: HTMLElement;
+  private closeButton!: HTMLButtonElement;
 
   constructor(container: HTMLElement, events: IEvents) {
     super(container);
     this.events = events;
+
+    this.createTemplate();
   }
 
-  public render(total?: number): HTMLElement {
-    // Клонируем шаблон из HTML
-    const template = cloneTemplate<HTMLElement>("#success");
+  // Создаёт шаблон успеха
+  private createTemplate(): void {
+    this.successTemplate = cloneTemplate<HTMLElement>("#success");
 
-    // Находим элемент описания результата заказа
-    const descriptionElement = ensureElement<HTMLElement>(
+    this.descriptionElement = ensureElement<HTMLElement>(
       ".order-success__description",
-      template
+      this.successTemplate
     );
 
-    // Находим кнопку закрытия сообщения
-    const closeButton = ensureElement<HTMLButtonElement>(
+    this.closeButton = ensureElement<HTMLButtonElement>(
       ".order-success__close",
-      template
+      this.successTemplate
     );
 
-    // Обработчик кнопки закрытия
-    closeButton.addEventListener("click", () => {
+    // Навешиваем обработчик закрытия
+    this.closeButton.addEventListener("click", () => {
       this.events.emit("modal:close");
       this.events.emit("catalog:open");
     });
+  }
 
-    // Если передана сумма заказа — обновляем текст описания
-    if (total) {
-      descriptionElement.textContent = `Списано ${total} синапсов`;
+  // Рендерит форму успеха, подставляя сумму заказа
+  public render(total?: number): HTMLElement {
+    if (total !== undefined) {
+      this.descriptionElement.textContent = `Списано ${total} синапсов`;
     }
-
-    return template;
+    return this.successTemplate;
   }
 }

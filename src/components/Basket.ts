@@ -2,94 +2,91 @@ import { Component } from "./base/Component";
 import { cloneTemplate, ensureElement } from "../utils/utils";
 import { CardBasket, ICardBasketData } from "./cards/CardBasket";
 import { IEvents } from "./base/Events";
-import { Cart } from "./models/cart";
 
-// Класс корзины
+// Класс корзины 
 export class Basket extends Component<{}> {
   protected items: CardBasket[] = [];
   protected events: IEvents;
-  protected cart: Cart;
   protected listContainer: HTMLElement;
   protected totalPriceElement: HTMLElement;
   protected orderButton: HTMLButtonElement;
   protected containerBasket: HTMLElement;
 
-  constructor(events: IEvents, cart: Cart) {
+  constructor(events: IEvents) {
     super(document.createElement("div"));
     this.events = events;
-    this.cart = cart;
 
-    // клонируем шаблон корзины из HTML
     const basketTemplate = cloneTemplate<HTMLElement>("#basket");
     this.containerBasket = basketTemplate;
 
-    // получаем нужные элементы внутри корзины
     this.listContainer = ensureElement<HTMLElement>(
       ".basket__list",
       basketTemplate
     );
+
     this.totalPriceElement = ensureElement<HTMLElement>(
       ".basket__price",
       basketTemplate
     );
+
     this.orderButton = ensureElement<HTMLButtonElement>(
       ".basket__button",
       basketTemplate
     );
 
-    // обработчик на кнопку "Оформить заказ"
     this.orderButton.addEventListener("click", () => {
-      this.events.emit("basket:order");
-    });
-
-    // обработчик удаления товара из корзины (по событию от карточки)
-    this.events.on("basket:item:remove", ({ index }: { index: number }) => {
-      const item = this.items.find((i) => i.getIndex() === index);
-      if (item) {
-        const productId = item.data.id;
-        const product = this.cart.getItems().find((i) => i.id === productId);
-        if (product) {
-          // удаляем товар из модели корзины
-          this.cart.removeItem(product);
-          // перерисовываем корзину
-          this.render();
-          // обновляем счётчик в шапке
-          this.events.emit("cart:changed");
-        }
-      }
+      this.events.emit("basket:order"); 
     });
   }
 
-  // рендер корзины
-  public render(): HTMLElement {
+  // Устанавливает товары корзины и обновляет список
+  public setItems(items: ICardBasketData[]): void {
     this.items = [];
 
-    const cartItems = this.cart.getItems();
-
-    // если корзина пуста — выводим заглушку
-    if (cartItems.length === 0) {
+    if (!items.length) {
       this.listContainer.innerHTML = "<div>Корзина пуста</div>";
-    } else {
-      this.listContainer.innerHTML = "";
-      cartItems.forEach((product, idx) => {
-        const cardData: ICardBasketData = {
-          ...product,
-          index: idx + 1,
-        };
-        const card = new CardBasket(this.listContainer, cardData, this.events);
-        this.items.push(card);
-      });
-
-      // заменяем содержимое контейнера на карточки
-      this.listContainer.replaceChildren(
-        ...this.items.map((item) => item.render())
-      );
+      this.orderButton.disabled = true;
+      this.resetScroll();
+      return;
     }
 
-    // обновляем общую сумму
-    this.totalPriceElement.textContent = `${this.cart.getTotalPrice()} синапсов`;
-    this.orderButton.disabled = cartItems.length === 0;
+    this.listContainer.innerHTML = "";
 
+    this.items = items.map(
+      (data) => new CardBasket(this.listContainer, data, this.events)
+    );
+
+    this.listContainer.replaceChildren(
+      ...this.items.map((item) => item.render())
+    );
+
+    this.orderButton.disabled = false;
+    this.updateScroll();
+  }
+
+  // Обновление общей суммы
+  public setTotalPrice(total: number): void {
+    this.totalPriceElement.textContent = `${total} синапсов`;
+  }
+
+  // Скролл при большом количестве товаров
+  protected updateScroll(): void {
+    if (this.items.length > 3) {
+      this.listContainer.style.maxHeight = "360px";
+      this.listContainer.style.overflowY = "auto";
+      this.listContainer.style.paddingRight = "15px";
+    } else {
+      this.resetScroll();
+    }
+  }
+
+  protected resetScroll(): void {
+    this.listContainer.style.maxHeight = "";
+    this.listContainer.style.overflowY = "";
+    this.listContainer.style.paddingRight = "";
+  }
+
+  public render(): HTMLElement {
     return this.containerBasket;
   }
 }

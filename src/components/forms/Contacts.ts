@@ -6,104 +6,124 @@ import { Buyer } from "../models/buyer";
 
 export type IContactsFormData = Pick<IBuyer, "email" | "phone">;
 
-// Класс формы
+// Класс формы Контактов
 export class Contacts extends Form<IContactsFormData> {
+  private contactsTemplate!: HTMLElement;
+  private emailInput!: HTMLInputElement;
+  private phoneInput!: HTMLInputElement;
+
   constructor(container: HTMLElement, events: IEvents, private buyer: Buyer) {
     super(container, events);
 
-    // Клонируем шаблон формы
+    // Создаём шаблон формы
+    this.contactsTemplate = this.createTemplate();
+  }
+
+  // Создаёт и инициализирует шаблон формы контактов
+  private createTemplate(): HTMLElement {
     const template = cloneTemplate<HTMLFormElement>("#contacts");
 
-    // Очищаем контейнер перед вставкой
-    container.replaceChildren(template);
+    this.formElement = template as HTMLFormElement;
 
-    // Получаем элементы формы
-    this.formElement = ensureElement<HTMLFormElement>(".form", container);
     this.submitButton = ensureElement<HTMLButtonElement>(
       ".button",
       this.formElement
     );
+
     this.errorContainer = ensureElement<HTMLElement>(
       ".form__errors",
       this.formElement
     );
 
-    // Поля формы, которые нужно валидировать
+    // Поля формы, которые будем валидировать
     this.fieldsToValidate = ["email", "phone"];
 
-    // Сброс формы
-    this.resetForm?.();
+    // Получаем элементы формы
+    this.emailInput = ensureElement<HTMLInputElement>(
+      "input[name='email']",
+      this.formElement
+    );
+    this.phoneInput = ensureElement<HTMLInputElement>(
+      "input[name='phone']",
+      this.formElement
+    );
 
-    // Инициализация обработчиков для полей формы
+    this.resetForm();
     this.initFields();
-
-    // Проверка валидности сразу при рендере
     this.checkValidity();
+    this.initSubmit();
 
-    // Инициализация формы
-    this.init();
+    return template;
   }
 
-  // Инициализация полей формы — навешиваем обработчики ввода
+  // Возвращает готовый элемент формы
+  public render(): HTMLElement {
+    return this.contactsTemplate;
+  }
+
+  // Инициализация обработчиков полей формы
   private initFields(): void {
-    const emailInput = this.formElement.querySelector<HTMLInputElement>(
-      "input[name='email']"
-    );
-    const phoneInput = this.formElement.querySelector<HTMLInputElement>(
-      "input[name='phone']"
-    );
-
-    if (emailInput) {
-      emailInput.addEventListener("input", () => {
-        // Обновляем модель покупателя
-        this.buyer.setEmail(emailInput.value);
-        // Проверяем валидность формы при изменении поля
+    if (this.emailInput) {
+      this.emailInput.addEventListener("input", () => {
+        this.buyer.setEmail(this.emailInput.value);
         this.checkValidity();
       });
     }
 
-    if (phoneInput) {
-      phoneInput.addEventListener("input", () => {
-        this.buyer.setPhone(phoneInput.value);
+    if (this.phoneInput) {
+      this.phoneInput.addEventListener("input", () => {
+        this.buyer.setPhone(this.phoneInput.value);
         this.checkValidity();
       });
     }
   }
 
-  // Проверка валидности всех полей формы
+  // Инициализация сабмита формы
+  private initSubmit(): void {
+    this.formElement.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (this.checkValidity()) {
+        this.onSubmit();
+      }
+    });
+
+    this.submitButton.addEventListener("click", () => {
+      this.formElement.requestSubmit();
+    });
+  }
+
+  // Проверка валидности формы
   protected checkValidity(): boolean {
     const validation = this.buyer.validateAll(this.fieldsToValidate);
     const message = this.buyer.getValidationMessage(validation.errors);
 
     if (!validation.isValid) {
-      // Показываем ошибку, если есть
       this.showError(message);
-      // Блокируем кнопку сабмита
       this.submitButton.disabled = true;
       return false;
     }
 
-    // Убираем сообщение об ошибке
     this.clearErrors();
     this.submitButton.disabled = false;
     return true;
   }
 
-  // Действия при сабмите формы
+  // При успешной отправке формы — вызываем событие
   protected onSubmit(): void {
-    // Генерируем событие, чтобы сообщить, что форма отправлена
     this.events.emit("contacts:submitted", this.buyer.getData());
   }
 
   protected getSubmitText(): string {
-    // Текст кнопки сабмита
     return "Оплатить";
   }
 
+  // Сброс формы — очищаем поля и выключаем кнопку
   protected resetForm(): void {
-    // Сброс формы — очищаем все поля и блокируем кнопку сабмита
     this.buyer.setEmail("");
     this.buyer.setPhone("");
     this.submitButton.disabled = true;
+
+    if (this.emailInput) this.emailInput.value = "";
+    if (this.phoneInput) this.phoneInput.value = "";
   }
 }

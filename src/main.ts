@@ -8,11 +8,12 @@ import { WebLarekApi } from "./components/models/webLarekApi";
 import { Api } from "./components/base/Api";
 import { API_URL } from "./utils/constants";
 import { EventEmitter } from "./components/base/Events";
+import { ensureElement } from "./utils/utils";
 
 import { Header } from "./components/Header";
 import { Catalog } from "./components/Catalog";
-import { CardCatalog } from "./components/cards/CardCatalog";
 import { Modal } from "./components/Modal";
+import { CardCatalog } from "./components/cards/CardCatalog";
 import { CardPreview } from "./components/cards/CardPreview";
 import { Basket } from "./components/Basket";
 import { Order } from "./components/forms/Order";
@@ -25,115 +26,122 @@ document.addEventListener("DOMContentLoaded", async () => {
   const webLarekApi = new WebLarekApi(api);
 
   const buyer = new Buyer();
-  const cart = new Cart();
+  const cart = new Cart(events);
   const products = new Products();
 
-  // Инициализация основных компонентов
-  const header = new Header(
-    events,
-    document.querySelector(".header") as HTMLElement
-  );
-  const catalog = new Catalog(
-    document.querySelector(".gallery") as HTMLElement
-  );
+  // Интерфейс
+  const header = new Header(events, ensureElement<HTMLElement>(".header"));
+  const catalog = new Catalog(ensureElement<HTMLElement>(".gallery"), events);
   const modal = new Modal(
-    document.getElementById("modal-container") as HTMLElement,
+    ensureElement<HTMLElement>("#modal-container"),
     events
   );
-  const basket = new Basket(events, cart);
+  const basket = new Basket(events);
 
-  // Подписки на события
-  events.on("cart:changed", () => (header.counter = cart.getCount()));
+  // Формы
+  const order = new Order(document.createElement("div"), events, buyer);
+  const contacts = new Contacts(document.createElement("div"), events, buyer);
+  const success = new OrderSuccess(document.createElement("div"), events);
 
-  events.on("card:add", ({ productId }: { productId: string }) => {
+  // Обновление корзины
+  events.on("cart:changed", () => {
+    basket.setItems(
+      cart.getItems().map((product, index) => ({
+        ...product,
+        index: index + 1,
+      }))
+    );
+
+    basket.setTotalPrice(cart.getTotalPrice());
+    header.counter = cart.getCount();
+  });
+
+  // Добавление товара в корзину
+  events.on<{ productId: string }>("card:add", ({ productId }) => {
     const product = products.getItemById(productId);
     if (product && !cart.hasItem(product.id)) {
       cart.addItem(product);
-      events.emit("cart:changed");
     }
   });
 
-  events.on("card:remove", ({ productId }: { productId: string }) => {
+  // Удаление товара из корзины
+  events.on<{ productId: string }>("card:remove", ({ productId }) => {
     const item = cart.getItems().find((i) => i.id === productId);
     if (item) {
       cart.removeItem(item);
-      events.emit("cart:changed");
     }
   });
 
-  events.on("basket:open", () => modal.open(basket.render()));
+  // Открытие корзины
+  events.on("basket:open", () => {
+    modal.open(basket.render());
+  });
 
+  // Переход к оформлению заказа
   events.on("basket:order", () => {
     if (cart.getCount() === 0) return;
-    startOrderProcess();
+    modal.open(order.render());
   });
 
-  events.on("card:select", ({ productId }: { productId: string }) => {
-    const product = products.getItemById(productId);
-    if (product) {
-      const inBasket = cart.hasItem(product.id);
-      const previewCard = new CardPreview(
-        document.createElement("div"),
-        {
-          ...product,
-          inBasket,
-          buttonText: inBasket ? "Удалить из корзины" : "Купить",
-        },
-        events
-      );
-      modal.open(previewCard.render());
+  // После заполнения формы заказа — открываем контакты
+  events.on("order:submitted", () => {
+    modal.open(contacts.render());
+  });
+
+  // Отправка заказа
+  events.on("contacts:submitted", async () => {
+    const orderData = buyer.getOrderData(cart.getItems(), cart.getTotalPrice());
+
+    try {
+      const response = await webLarekApi.sendOrder(orderData);
+      cart.clear();
+      buyer.clear();
+      modal.open(success.render(response.total));
+    } catch (err) {
+      console.error("Ошибка при оформлении заказа:", err);
     }
   });
 
+  // Загрузка каталога
+  try {
+    const items = await webLarekApi.fetchProducts();
+    products.setItems(items);
+
+    catalog.itemsList = items.map(
+      (item) =>
+        new CardCatalog(document.createElement("div"), { ...item }, events)
+    );
+
+    catalog.render();
+  } catch (err) {
+    console.error("Ошибка загрузки товаров:", err);
+  }
+
+  // Предпросмотр карточки товара
+  events.on<{ productId: string }>("card:select", ({ productId }) => {
+    const product = products.getItemById(productId);
+    if (!product) return;
+
+    const inBasket = cart.hasItem(product.id);
+    const preview = new CardPreview(
+      document.createElement("div"),
+      {
+        ...product,
+        inBasket,
+        buttonText: inBasket ? "Удалить из корзины" : "Купить",
+      },
+      events
+    );
+
+    modal.open(preview.render());
+  });
+
+  // Возврат к каталогу
   events.on("catalog:open", () => {
     modal.close();
     catalog.render();
   });
 
-  // Загрузка товаров
-  const items = await webLarekApi.fetchProducts();
-  products.setItems(items);
-  catalog.itemsList = items.map(
-    (item) =>
-      new CardCatalog(document.createElement("div"), { ...item }, events)
-  );
-
-  /** Запуск процесса оформления заказа */
-  function startOrderProcess() {
-    const orderContainer = document.createElement("div");
-    const order = new Order(orderContainer, events, buyer);
-    modal.open(order.render());
-
-    const onOrderSubmitted = () => {
-      events.off("order:submitted", onOrderSubmitted);
-
-      const contactsContainer = document.createElement("div");
-      const contacts = new Contacts(contactsContainer, events, buyer);
-      modal.open(contacts.render());
-
-      const onContactsSubmitted = async () => {
-        events.off("contacts:submitted", onContactsSubmitted);
-
-        const orderData = buyer.getOrderData(
-          cart.getItems(),
-          cart.getTotalPrice()
-        );
-        const total = cart.getTotalPrice();
-
-        await webLarekApi.sendOrder(orderData);
-
-        cart.clear();
-        buyer.clear();
-        events.emit("cart:changed");
-
-        const successContainer = document.createElement("div");
-        const orderSuccess = new OrderSuccess(successContainer, events);
-        modal.open(orderSuccess.render(total));
-      };
-
-      events.on("contacts:submitted", onContactsSubmitted);
-    };
-
-    events.on("order:submitted", onOrderSubmitted);
-  }
+  // Синхронизация при старте
+  events.emit("cart:changed");
 });

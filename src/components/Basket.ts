@@ -1,11 +1,9 @@
 import { Component } from "./base/Component";
 import { cloneTemplate, ensureElement } from "../utils/utils";
-import { CardBasket, ICardBasketData } from "./cards/CardBasket";
 import { IEvents } from "./base/Events";
 
-// Класс корзины 
+// Класс корзины
 export class Basket extends Component<{}> {
-  protected items: CardBasket[] = [];
   protected events: IEvents;
   protected listContainer: HTMLElement;
   protected totalPriceElement: HTMLElement;
@@ -23,26 +21,22 @@ export class Basket extends Component<{}> {
       ".basket__list",
       basketTemplate
     );
-
     this.totalPriceElement = ensureElement<HTMLElement>(
       ".basket__price",
       basketTemplate
     );
-
     this.orderButton = ensureElement<HTMLButtonElement>(
       ".basket__button",
       basketTemplate
     );
 
     this.orderButton.addEventListener("click", () => {
-      this.events.emit("basket:order"); 
+      this.events.emit("basket:order");
     });
   }
 
-  // Устанавливает товары корзины и обновляет список
-  public setItems(items: ICardBasketData[]): void {
-    this.items = [];
-
+  // Устанавливает список товаров в корзине
+  public setItems(items: HTMLElement[]): void {
     if (!items.length) {
       this.listContainer.innerHTML = "<div>Корзина пуста</div>";
       this.orderButton.disabled = true;
@@ -51,27 +45,19 @@ export class Basket extends Component<{}> {
     }
 
     this.listContainer.innerHTML = "";
-
-    this.items = items.map(
-      (data) => new CardBasket(this.listContainer, data, this.events)
-    );
-
-    this.listContainer.replaceChildren(
-      ...this.items.map((item) => item.render())
-    );
-
+    this.listContainer.replaceChildren(...items);
     this.orderButton.disabled = false;
     this.updateScroll();
   }
 
-  // Обновление общей суммы
+  // Устанавливает список товаров в корзине
   public setTotalPrice(total: number): void {
     this.totalPriceElement.textContent = `${total} синапсов`;
   }
 
   // Скролл при большом количестве товаров
   protected updateScroll(): void {
-    if (this.items.length > 3) {
+    if (this.listContainer.children.length > 3) {
       this.listContainer.style.maxHeight = "360px";
       this.listContainer.style.overflowY = "auto";
       this.listContainer.style.paddingRight = "15px";
@@ -80,12 +66,14 @@ export class Basket extends Component<{}> {
     }
   }
 
+  // Сбрасывает настройки скролла
   protected resetScroll(): void {
     this.listContainer.style.maxHeight = "";
     this.listContainer.style.overflowY = "";
     this.listContainer.style.paddingRight = "";
   }
 
+  // Возвращает элемент корзины для вставки в DOM
   public render(): HTMLElement {
     return this.containerBasket;
   }

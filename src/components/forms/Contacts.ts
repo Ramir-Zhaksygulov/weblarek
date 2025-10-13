@@ -2,27 +2,26 @@ import { Form } from "./Form";
 import { IEvents } from "../base/Events";
 import { ensureElement, cloneTemplate } from "../../utils/utils";
 import { IBuyer } from "../../types";
-import { Buyer } from "../models/buyer";
 
 export type IContactsFormData = Pick<IBuyer, "email" | "phone">;
 
-// Класс формы Контактов
+// Класс формы контактов
 export class Contacts extends Form<IContactsFormData> {
   private contactsTemplate!: HTMLElement;
   private emailInput!: HTMLInputElement;
   private phoneInput!: HTMLInputElement;
+  private formData: Partial<IContactsFormData> = {};
 
-  constructor(container: HTMLElement, events: IEvents, private buyer: Buyer) {
+  constructor(container: HTMLElement, events: IEvents) {
     super(container, events);
-
-    // Создаём шаблон формы
     this.contactsTemplate = this.createTemplate();
+    this.init();
+    this.initValidation();
   }
 
-  // Создаёт и инициализирует шаблон формы контактов
+  // Создаёт DOM-шаблон формы контактов
   private createTemplate(): HTMLElement {
     const template = cloneTemplate<HTMLFormElement>("#contacts");
-
     this.formElement = template as HTMLFormElement;
 
     this.submitButton = ensureElement<HTMLButtonElement>(
@@ -35,10 +34,20 @@ export class Contacts extends Form<IContactsFormData> {
       this.formElement
     );
 
-    // Поля формы, которые будем валидировать
-    this.fieldsToValidate = ["email", "phone"];
+    this.initFields();
+    this.resetForm();
 
-    // Получаем элементы формы
+    return template;
+  }
+
+  // Отрисовывает форму контактов
+  public render(): HTMLElement {
+    this.setFormData(this.formData);
+    return this.contactsTemplate;
+  }
+
+  // Инициализация полей формы и добавление обработчиков событий
+  private initFields(): void {
     this.emailInput = ensureElement<HTMLInputElement>(
       "input[name='email']",
       this.formElement
@@ -48,82 +57,55 @@ export class Contacts extends Form<IContactsFormData> {
       this.formElement
     );
 
-    this.resetForm();
-    this.initFields();
+    this.emailInput.addEventListener("input", () => {
+      this.formData.email = this.emailInput.value;
+      this.events.emit("contacts:change", { ...this.formData });
+    });
+
+    this.phoneInput.addEventListener("input", () => {
+      this.formData.phone = this.phoneInput.value;
+      this.events.emit("contacts:change", { ...this.formData });
+    });
+  }
+
+  // Инициализация валидации формы
+  private initValidation() {
+    this.formElement.addEventListener("input", () => {
+      this.events.emit("contacts:change", { ...this.formData });
+    });
+  }
+
+  // Устанавливает данные формы
+  public setFormData(data: Partial<IContactsFormData>) {
+    this.formData = { ...data };
+    if (data.email) this.emailInput.value = data.email;
+    if (data.phone) this.phoneInput.value = data.phone;
+
+    this.events.emit("contacts:change", { ...this.formData });
     this.checkValidity();
-    this.initSubmit();
-
-    return template;
   }
 
-  // Возвращает готовый элемент формы
-  public render(): HTMLElement {
-    return this.contactsTemplate;
-  }
-
-  // Инициализация обработчиков полей формы
-  private initFields(): void {
-    if (this.emailInput) {
-      this.emailInput.addEventListener("input", () => {
-        this.buyer.setEmail(this.emailInput.value);
-        this.checkValidity();
-      });
-    }
-
-    if (this.phoneInput) {
-      this.phoneInput.addEventListener("input", () => {
-        this.buyer.setPhone(this.phoneInput.value);
-        this.checkValidity();
-      });
-    }
-  }
-
-  // Инициализация сабмита формы
-  private initSubmit(): void {
-    this.formElement.addEventListener("submit", (e) => {
-      e.preventDefault();
-      if (this.checkValidity()) {
-        this.onSubmit();
-      }
-    });
-
-    this.submitButton.addEventListener("click", () => {
-      this.formElement.requestSubmit();
-    });
-  }
-
-  // Проверка валидности формы
-  protected checkValidity(): boolean {
-    const validation = this.buyer.validateAll(this.fieldsToValidate);
-    const message = this.buyer.getValidationMessage(validation.errors);
-
-    if (!validation.isValid) {
-      this.showError(message);
-      this.submitButton.disabled = true;
-      return false;
-    }
-
+  // Сбрасывает форму контактов
+  public resetForm(): void {
+    this.formData = {};
+    this.emailInput.value = "";
+    this.phoneInput.value = "";
+    this.setSubmitEnabled(false);
     this.clearErrors();
-    this.submitButton.disabled = false;
-    return true;
+    this.events.emit("contacts:change", { ...this.formData });
   }
 
-  // При успешной отправке формы — вызываем событие
-  protected onSubmit(): void {
-    this.events.emit("contacts:submitted", this.buyer.getData());
+  protected checkValidity(): boolean {
+    const valid = !!this.formData.email && !!this.formData.phone;
+    this.setSubmitEnabled(valid);
+    return valid;
   }
 
   protected getSubmitText(): string {
     return "Оплатить";
   }
 
-  // Сброс формы — очищаем поля и выключаем кнопку
-  protected resetForm(): void {
-    this.buyer.setEmail("");
-    this.buyer.setPhone("");
-    this.submitButton.disabled = true;
-
-    if (this.emailInput) this.emailInput.value = "";
-    if (this.phoneInput) this.phoneInput.value = "";
+  protected onSubmit(): void {
+    this.events.emit("contacts:submit", { ...this.formData });
   }
 }

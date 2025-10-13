@@ -1,5 +1,5 @@
 import { IBuyer, TPayment } from "../../types";
-import { EventEmitter, IEvents } from "../base/Events";
+import { IEvents } from "../base/Events";
 
 //Модель покупателя:
 export class Buyer {
@@ -10,11 +10,7 @@ export class Buyer {
     address: "",
   };
 
-  public events: IEvents;
-
-  constructor() {
-    this.events = new EventEmitter();
-  }
+  constructor(public events: IEvents) {}
 
   // Устанавливает способ оплаты
   setPayment(payment: TPayment): void {
@@ -48,7 +44,18 @@ export class Buyer {
   // Очищает данные покупателя
   clear(): void {
     this.data = { payment: "", email: "", phone: "", address: "" };
-    this.events.emit("buyer:cleared", { cleared: true });
+    this.events.emit("buyer:cleared");
+  }
+
+  // Возвращает сообщение об ошибке по умолчанию
+  private getErrorMessage(field: keyof IBuyer): string {
+    const messages: Record<keyof IBuyer, string> = {
+      payment: "Необходимо выбрать способ оплаты",
+      address: "Необходимо указать адрес",
+      email: "Необходимо указать email",
+      phone: "Необходимо указать номер телефона",
+    };
+    return messages[field];
   }
 
   // Валидирует выбранные поля
@@ -66,17 +73,6 @@ export class Buyer {
     });
 
     return { isValid: Object.keys(errors).length === 0, errors };
-  }
-
-  // Возвращает сообщение об ошибке по умолчанию
-  private getErrorMessage(field: keyof IBuyer): string {
-    const messages: Record<keyof IBuyer, string> = {
-      payment: "Необходимо выбрать способ оплаты",
-      address: "Необходимо указать адрес",
-      email: "Необходимо указать email",
-      phone: "Необходимо указать номер телефона",
-    };
-    return messages[field];
   }
 
   // Формирует текст ошибки для отображения

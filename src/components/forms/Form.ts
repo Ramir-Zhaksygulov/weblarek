@@ -13,7 +13,6 @@ export abstract class Form<T extends Partial<IBuyer>> extends Component<T> {
   constructor(container: HTMLElement, events: IEvents) {
     super(container);
     this.events = events;
-    this.init();
   }
 
   // Инициализация обработчиков формы
@@ -55,7 +54,7 @@ export abstract class Form<T extends Partial<IBuyer>> extends Component<T> {
   }
 
   // Вывод ошибки под формой
-  protected showError(message: string): void {
+  showError(message: string): void {
     if (this.errorContainer) {
       this.errorContainer.textContent = message;
     }
@@ -65,6 +64,12 @@ export abstract class Form<T extends Partial<IBuyer>> extends Component<T> {
   protected clearErrors(): void {
     if (this.errorContainer) {
       this.errorContainer.textContent = "";
+    }
+  }
+
+  setSubmitEnabled(enabled: boolean): void {
+    if (this.submitButton) {
+      this.submitButton.disabled = !enabled;
     }
   }
 

@@ -2,21 +2,23 @@ import { Form } from "./Form";
 import { IEvents } from "../base/Events";
 import { ensureElement, cloneTemplate } from "../../utils/utils";
 import { IBuyer } from "../../types";
-import { Buyer } from "../models/buyer";
 
 export type IOrderFormData = Pick<IBuyer, "payment" | "address">;
 
-// Класс формы оформления заказа
+// Класс формы заказа
 export class Order extends Form<IOrderFormData> {
   private orderTemplate!: HTMLElement;
   private paymentButtons: HTMLButtonElement[] = [];
+  private formData: Partial<IOrderFormData> = {};
 
-  constructor(container: HTMLElement, events: IEvents, private buyer: Buyer) {
+  constructor(container: HTMLElement, events: IEvents) {
     super(container, events);
     this.orderTemplate = this.createTemplate();
+    this.init();
+    this.initValidation();
   }
 
-  // Создаёт и инициализирует шаблон формы
+  // Создаёт DOM-шаблон формы заказа
   private createTemplate(): HTMLElement {
     const template = cloneTemplate<HTMLFormElement>("#order");
     this.formElement = template as HTMLFormElement;
@@ -31,30 +33,19 @@ export class Order extends Form<IOrderFormData> {
       this.formElement
     );
 
-    this.fieldsToValidate = ["payment", "address"];
-
-    // Сброс формы
-    this.resetForm();
-
-    // Инициализация полей
     this.initFields();
-
-    // Проверка валидности при создании
-    this.checkValidity();
-
-    // Инициализация сабмита формы
-    this.initSubmit();
-
+    this.resetForm();
     return template;
   }
 
+  // Отрисовывает форму заказа
   public render(): HTMLElement {
     return this.orderTemplate;
   }
 
-  // Получаем кнопки оплаты
+  // Возвращает список кнопок выбора оплаты
   private getPaymentButtons(): HTMLButtonElement[] {
-    if (this.paymentButtons.length === 0) {
+    if (!this.paymentButtons.length) {
       this.paymentButtons = Array.from(
         this.formElement.querySelectorAll<HTMLButtonElement>(
           "button[name='card'], button[name='cash']"
@@ -64,78 +55,77 @@ export class Order extends Form<IOrderFormData> {
     return this.paymentButtons;
   }
 
-  // Инициализация обработчиков
+  // Инициализация полей формы и добавление обработчиков событий
   private initFields(): void {
-    const paymentButtons = this.getPaymentButtons();
-
-    // Обработка кликов по кнопкам оплаты
-    paymentButtons.forEach((button) => {
+    this.getPaymentButtons().forEach((button) => {
       button.addEventListener("click", () => {
-        this.buyer.setPayment(button.name as IOrderFormData["payment"]);
-
-        // Сбрасываем стили
-        paymentButtons.forEach((btn) => (btn.style.backgroundColor = ""));
-
-        // Выделяем выбранную
-        button.style.backgroundColor = "#5F8CC7";
-
-        // Проверяем валидность
-        this.checkValidity();
+        this.formData.payment = button.name as IOrderFormData["payment"];
+        this.events.emit("order:change", { ...this.formData });
+        this.updatePaymentUI(button);
       });
     });
 
-    // Поле адреса
     const addressInput = this.formElement.querySelector<HTMLInputElement>(
       "input[name='address']"
     );
     if (addressInput) {
       addressInput.addEventListener("input", () => {
-        this.buyer.setAddress(addressInput.value);
-        this.checkValidity();
+        this.formData.address = addressInput.value;
+        this.events.emit("order:change", { ...this.formData });
       });
     }
   }
 
-  // Сабмит формы
-  private initSubmit(): void {
-    this.formElement.addEventListener("submit", (e) => {
-      e.preventDefault();
-      if (this.checkValidity()) {
-        this.onSubmit();
-      }
+  private updatePaymentUI(activeButton: HTMLButtonElement) {
+    this.getPaymentButtons().forEach((btn) => (btn.style.backgroundColor = ""));
+    activeButton.style.backgroundColor = "#5F8CC7";
+  }
+
+  // Инициализация валидации формы
+  private initValidation() {
+    this.formElement.addEventListener("input", () => {
+      this.events.emit("order:change", { ...this.formData });
     });
   }
 
-  // Проверка валидности
-  protected checkValidity(): boolean {
-    const validation = this.buyer.validateAll(this.fieldsToValidate);
-    const message = this.buyer.getValidationMessage(validation.errors);
-
-    if (!validation.isValid) {
-      this.showError(message);
-      this.submitButton.disabled = true;
-      return false;
+  // Устанавливает данные формы
+  public setFormData(data: Partial<IOrderFormData>) {
+    this.formData = { ...data };
+    if (data.payment) {
+      const btn = this.getPaymentButtons().find((b) => b.name === data.payment);
+      if (btn) this.updatePaymentUI(btn);
     }
-
-    this.clearErrors();
-    this.submitButton.disabled = false;
-    return true;
+    if (data.address) {
+      const addressInput = this.formElement.querySelector<HTMLInputElement>(
+        "input[name='address']"
+      );
+      if (addressInput) addressInput.value = data.address;
+    }
+    this.events.emit("order:change", { ...this.formData });
   }
 
-  // При успешной отправке формы
-  protected onSubmit(): void {
-    this.events.emit("order:submitted", this.buyer.getData());
+  // Сбрасывает форму заказа
+  public resetForm(): void {
+    this.getPaymentButtons().forEach((btn) => (btn.style.backgroundColor = ""));
+    this.formData = {};
+    this.setSubmitEnabled(false);
+    this.clearErrors();
+    const addressInput = this.formElement.querySelector<HTMLInputElement>(
+      "input[name='address']"
+    );
+    if (addressInput) addressInput.value = "";
+    this.events.emit("order:change", {});
+  }
+
+  protected checkValidity(): boolean {
+    return !!this.formData.payment && !!this.formData.address;
   }
 
   protected getSubmitText(): string {
-    return "Далее";
+    return "Оплатить";
   }
 
-  // Сброс формы
-  protected resetForm(): void {
-    this.buyer.setPayment("");
-    this.buyer.setAddress("");
-    this.submitButton.disabled = true;
-    this.getPaymentButtons().forEach((btn) => (btn.style.backgroundColor = ""));
+  protected onSubmit(): void {
+    this.events.emit("order:submit", { ...this.formData });
   }
 }

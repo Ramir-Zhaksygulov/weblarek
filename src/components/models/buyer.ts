@@ -15,25 +15,21 @@ export class Buyer {
   // Устанавливает способ оплаты
   setPayment(payment: TPayment): void {
     this.data.payment = payment;
-    this.events.emit("buyer:paymentChanged", { payment });
   }
 
   // Устанавливает email
   setEmail(email: string): void {
     this.data.email = email;
-    this.events.emit("buyer:emailChanged", { email });
   }
 
   // Устанавливает номер телефона
   setPhone(phone: string): void {
     this.data.phone = phone;
-    this.events.emit("buyer:phoneChanged", { phone });
   }
 
   // Устанавливает адрес доставки
   setAddress(address: string): void {
     this.data.address = address;
-    this.events.emit("buyer:addressChanged", { address });
   }
 
   // Возвращает текущие данные покупателя
@@ -44,7 +40,6 @@ export class Buyer {
   // Очищает данные покупателя
   clear(): void {
     this.data = { payment: "", email: "", phone: "", address: "" };
-    this.events.emit("buyer:cleared");
   }
 
   // Возвращает сообщение об ошибке по умолчанию

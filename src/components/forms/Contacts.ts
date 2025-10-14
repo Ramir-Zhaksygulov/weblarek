@@ -16,7 +16,6 @@ export class Contacts extends Form<IContactsFormData> {
     super(container, events);
     this.contactsTemplate = this.createTemplate();
     this.init();
-    this.initValidation();
   }
 
   // Создаёт DOM-шаблон формы контактов
@@ -35,14 +34,11 @@ export class Contacts extends Form<IContactsFormData> {
     );
 
     this.initFields();
-    this.resetForm();
-
     return template;
   }
 
   // Отрисовывает форму контактов
   public render(): HTMLElement {
-    this.setFormData(this.formData);
     return this.contactsTemplate;
   }
 
@@ -58,19 +54,16 @@ export class Contacts extends Form<IContactsFormData> {
     );
 
     this.emailInput.addEventListener("input", () => {
+      if (this.formData.email === this.emailInput.value) return;
       this.formData.email = this.emailInput.value;
+      this.checkValidity();
       this.events.emit("contacts:change", { ...this.formData });
     });
 
     this.phoneInput.addEventListener("input", () => {
+      if (this.formData.phone === this.phoneInput.value) return;
       this.formData.phone = this.phoneInput.value;
-      this.events.emit("contacts:change", { ...this.formData });
-    });
-  }
-
-  // Инициализация валидации формы
-  private initValidation() {
-    this.formElement.addEventListener("input", () => {
+      this.checkValidity();
       this.events.emit("contacts:change", { ...this.formData });
     });
   }
@@ -78,21 +71,15 @@ export class Contacts extends Form<IContactsFormData> {
   // Устанавливает данные формы
   public setFormData(data: Partial<IContactsFormData>) {
     this.formData = { ...data };
-    if (data.email) this.emailInput.value = data.email;
-    if (data.phone) this.phoneInput.value = data.phone;
-
-    this.events.emit("contacts:change", { ...this.formData });
+    this.emailInput.value = data.email || "";
+    this.phoneInput.value = data.phone || "";
     this.checkValidity();
+    this.events.emit("contacts:change", { ...this.formData });
   }
 
-  // Сбрасывает форму контактов
   public resetForm(): void {
-    this.formData = {};
-    this.emailInput.value = "";
-    this.phoneInput.value = "";
-    this.setSubmitEnabled(false);
+    this.setFormData({});
     this.clearErrors();
-    this.events.emit("contacts:change", { ...this.formData });
   }
 
   protected checkValidity(): boolean {

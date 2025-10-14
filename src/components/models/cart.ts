@@ -17,21 +17,18 @@ export class Cart {
   // Добавляет товар в корзину
   addItem(item: IProduct): void {
     this.items.push(item);
-    this.events.emit("cart:itemAdded", { item }); 
     this.events.emit("cart:changed"); 
   }
 
   // Удаляет товар из корзины
   removeItem(item: IProduct): void {
     this.items = this.items.filter((i) => i.id !== item.id);
-    this.events.emit("cart:itemRemoved", { item });
     this.events.emit("cart:changed");
   }
 
   // Очищает корзину
   clear(): void {
     this.items = [];
-    this.events.emit("cart:cleared");
     this.events.emit("cart:changed");
   }
 

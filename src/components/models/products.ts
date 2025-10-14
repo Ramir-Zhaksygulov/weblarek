@@ -1,14 +1,13 @@
 import { IProduct } from "../../types";
-import { EventEmitter, IEvents } from "../base/Events";
+import { IEvents } from "../base/Events";
 
 export class Products {
   private items: IProduct[] = [];
   private selectedProduct: IProduct | null = null;
-
   public events: IEvents;
 
-  constructor() {
-    this.events = new EventEmitter();
+  constructor(events: IEvents) {
+    this.events = events;
   }
 
   // Сохранение массива товаров
@@ -30,9 +29,6 @@ export class Products {
   // Сохранение выбранного товара
   setSelectedItem(item: IProduct): void {
     this.selectedProduct = item;
-    this.events.emit("products:selectedItemChanged", {
-      selectedItem: this.selectedProduct,
-    });
   }
 
   // Получение выбранного товара

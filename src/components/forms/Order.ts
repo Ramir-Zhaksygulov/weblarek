@@ -15,7 +15,6 @@ export class Order extends Form<IOrderFormData> {
     super(container, events);
     this.orderTemplate = this.createTemplate();
     this.init();
-    this.initValidation();
   }
 
   // Создаёт DOM-шаблон формы заказа
@@ -34,7 +33,6 @@ export class Order extends Form<IOrderFormData> {
     );
 
     this.initFields();
-    this.resetForm();
     return template;
   }
 
@@ -59,9 +57,11 @@ export class Order extends Form<IOrderFormData> {
   private initFields(): void {
     this.getPaymentButtons().forEach((button) => {
       button.addEventListener("click", () => {
+        if (this.formData.payment === button.name) return;
         this.formData.payment = button.name as IOrderFormData["payment"];
-        this.events.emit("order:change", { ...this.formData });
         this.updatePaymentUI(button);
+        this.checkValidity();
+        this.events.emit("order:change", { ...this.formData });
       });
     });
 
@@ -70,7 +70,9 @@ export class Order extends Form<IOrderFormData> {
     );
     if (addressInput) {
       addressInput.addEventListener("input", () => {
+        if (this.formData.address === addressInput.value) return;
         this.formData.address = addressInput.value;
+        this.checkValidity();
         this.events.emit("order:change", { ...this.formData });
       });
     }
@@ -81,48 +83,38 @@ export class Order extends Form<IOrderFormData> {
     activeButton.style.backgroundColor = "#5F8CC7";
   }
 
-  // Инициализация валидации формы
-  private initValidation() {
-    this.formElement.addEventListener("input", () => {
-      this.events.emit("order:change", { ...this.formData });
-    });
-  }
-
   // Устанавливает данные формы
   public setFormData(data: Partial<IOrderFormData>) {
     this.formData = { ...data };
+    this.getPaymentButtons().forEach((btn) => (btn.style.backgroundColor = ""));
     if (data.payment) {
       const btn = this.getPaymentButtons().find((b) => b.name === data.payment);
       if (btn) this.updatePaymentUI(btn);
     }
-    if (data.address) {
-      const addressInput = this.formElement.querySelector<HTMLInputElement>(
-        "input[name='address']"
-      );
-      if (addressInput) addressInput.value = data.address;
-    }
+
+    const addressInput = this.formElement.querySelector<HTMLInputElement>(
+      "input[name='address']"
+    );
+    if (addressInput) addressInput.value = data.address || "";
+
+    this.checkValidity();
     this.events.emit("order:change", { ...this.formData });
   }
 
   // Сбрасывает форму заказа
   public resetForm(): void {
-    this.getPaymentButtons().forEach((btn) => (btn.style.backgroundColor = ""));
-    this.formData = {};
-    this.setSubmitEnabled(false);
+    this.setFormData({});
     this.clearErrors();
-    const addressInput = this.formElement.querySelector<HTMLInputElement>(
-      "input[name='address']"
-    );
-    if (addressInput) addressInput.value = "";
-    this.events.emit("order:change", {});
   }
 
   protected checkValidity(): boolean {
-    return !!this.formData.payment && !!this.formData.address;
+    const valid = !!this.formData.payment && !!this.formData.address;
+    this.setSubmitEnabled(valid);
+    return valid;
   }
 
   protected getSubmitText(): string {
-    return "Оплатить";
+    return "Далее";
   }
 
   protected onSubmit(): void {

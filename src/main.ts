@@ -21,7 +21,7 @@ import { Contacts } from "./components/forms/Contacts";
 import { OrderSuccess } from "./components/OrderSuccess";
 import { CardBasket } from "./components/cards/CardBasket";
 
-import { TPayment } from "./types";
+import { TPayment, IProduct } from "./types";
 
 // Точка входа приложения — выполняется после полной загрузки DOM
 document.addEventListener("DOMContentLoaded", async () => {
@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Создаём модели данных
   const buyer = new Buyer(events);
   const cart = new Cart(events);
-  const products = new Products();
+  const products = new Products(events);
 
   // Представления
   const header = new Header(events, ensureElement<HTMLElement>(".header"));
@@ -101,11 +101,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Отправка формы заказа
   events.on("order:submit", () => {
-    const { isValid, errors } = buyer.validateAll(["payment", "address"]);
-    if (!isValid) {
-      order.showError(buyer.getValidationMessage(errors));
-      return;
-    }
     modal.open(contacts.render());
   });
 
@@ -145,17 +140,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // Загрузка каталога товаров
-  try {
-    const items = await webLarekApi.fetchProducts();
-    products.setItems(items);
-
+  events.on<{ items: IProduct[] }>("products:itemsChanged", ({ items }) => {
     catalog.itemsList = items.map(
       (item) =>
         new CardCatalog(document.createElement("div"), { ...item }, events)
     );
-
     catalog.render();
+  });
+
+  // Загрузка каталога товаров
+  try {
+    const items = await webLarekApi.fetchProducts();
+    products.setItems(items);
   } catch (err) {
     console.error("Ошибка загрузки товаров:", err);
   }
